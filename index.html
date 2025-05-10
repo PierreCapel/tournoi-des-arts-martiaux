@@ -1,28 +1,28 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Le Tournoi Des Arts Martiaux</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vuex/4.1.0/vuex.global.prod.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/4.2.4/vue-router.global.prod.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <style>
-      body {
-        background-color: #ffd54f;
-        background-image: url('./tournoi-background.jpg');
-        font-family: 'Arial', sans-serif;
-        overflow-x: hidden;
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Le Tournoi Des Arts Martiaux</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vuex/4.1.0/vuex.global.prod.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/4.2.4/vue-router.global.prod.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #ffd54f;
+      background-image: url('./tournoi-background.jpg');
+      font-family: 'Arial', sans-serif;
+      overflow-x: hidden;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
 
-      html {
-        overflow-x: hidden;
-        max-width: 100vw;
-      }
+    html {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
 
     .dbz-container {
       background-color: rgba(255, 255, 255, 0.9);
@@ -95,900 +95,785 @@
     .pulse-animation {
       animation: pulse 2s infinite;
     }
-    </style>
-  </head>
-  <body>
-    <div id="app"></div>
+  </style>
+</head>
+<body>
+<div id="app"></div>
 
-    <script>
-      const { createApp, ref, computed, onMounted, watch } = Vue;
-      const { createStore } = Vuex;
-      const { createRouter, createWebHashHistory } = VueRouter;
+<script>
+  const { createApp, ref, computed, onMounted, watch } = Vue;
+  const { createStore } = Vuex;
+  const { createRouter, createWebHashHistory } = VueRouter;
 
-      // Store pour gérer l'état global
-      const store = createStore({
-        state() {
-          return {
-            tournament: null,
-            players: [],
-            matches: [],
-            currentMatchIndex: 0,
-            results: []
-          }
-        },
-        getters: {
-          tournamentExists(state) {
-            return state.tournament !== null;
-          },
-          currentMatch(state) {
-            return state.matches[state.currentMatchIndex] || null;
-          },
-          playerRankings(state) {
-            if (!state.players.length) return [];
+  const store = createStore({
+    state() {
+      return {
+        tournament: null,
+        players: [],
+        matches: [],
+        currentMatchIndex: 0,
+        results: []
+      }
+    },
+    getters: {
+      tournamentExists(state) {
+        return state.tournament !== null;
+      },
+      currentMatch(state) {
+        return state.matches[state.currentMatchIndex] || null;
+      },
+      playerRankings(state) {
+        if (!state.players.length) return [];
 
-            return [...state.players].map(player => {
-              const victories = state.results.filter(r => r.winner === player.id).length;
-              return { ...player, victories };
-            }).sort((a, b) => b.victories - a.victories);
-          },
-          dpRankings(state) {
-            if (!state.players.length) return [];
+        return [...state.players].map(player => {
+          const victories = state.results.filter(r => r.winner === player.id).length;
+          return { ...player, victories };
+        }).sort((a, b) => b.victories - a.victories);
+      },
+      dpRankings(state) {
+        if (!state.players.length) return [];
 
-            return [...state.players].map(player => {
-              const dpTotal = state.results.reduce((sum, result) => {
-                if (result.player1 === player.id) return sum + (result.player1DP || 0);
-                if (result.player2 === player.id) return sum + (result.player2DP || 0);
-                return sum;
-              }, 0);
-              return { ...player, dpTotal };
-            }).sort((a, b) => b.dpTotal - a.dpTotal);
-          },
-          tournamentWinner(state, getters) {
-            if (!state.tournament || !getters.playerRankings.length) return null;
+        return [...state.players].map(player => {
+          const dpTotal = state.results.reduce((sum, result) => {
+            if (result.player1 === player.id) return sum + (result.player1DP || 0);
+            if (result.player2 === player.id) return sum + (result.player2DP || 0);
+            return sum;
+          }, 0);
+          return { ...player, dpTotal };
+        }).sort((a, b) => b.dpTotal - a.dpTotal);
+      },
+      tournamentWinner(state, getters) {
+        if (!state.tournament || !getters.playerRankings.length) return null;
 
-            const sorted = getters.playerRankings;
-            const first = sorted[0];
-            const second = sorted[1] || { victories: 0 };
+        const sorted = getters.playerRankings;
+        const first = sorted[0];
+        const second = sorted[1] || { victories: 0 };
 
-            // Vérification des conditions de victoire
-            if (first.victories >= state.tournament.victoriesToWin) {
-              if (!state.tournament.tieBreakEnabled || 
-                (first.victories - second.victories) >= 2) {
-                return first;
-              }
-            }
-
-            return null;
-          },
-          completedMatches(state) {
-            return state.results.map(result => {
-              const match = state.matches.find(m => m.id === result.matchId);
-              if (!match) return null;
-
-              const player1 = state.players.find(p => p.id === match.player1);
-              const player2 = state.players.find(p => p.id === match.player2);
-              const winner = state.players.find(p => p.id === result.winner);
-
-              if (!player1 || !player2 || !winner) return null;
-
-              return {
-                ...result,
-                player1: match.player1,
-                player2: match.player2,
-                player1Name: player1.name,
-                player2Name: player2.name,
-                winnerName: winner.name,
-                player1DP: result.player1DP,
-                player2DP: result.player2DP
-              };
-            }).filter(match => match !== null);
-          },
-          isTournamentFinished(state, getters) {
-            return getters.tournamentWinner !== null;
-          }
-        },
-        mutations: {
-          createTournament(state, tournament) {
-            state.tournament = tournament;
-          },
-
-          addPlayer(state, player) {
-            state.players.push(player);
-          },
-
-          removePlayer(state, playerId) {
-            state.players = state.players.filter(p => p.id !== playerId);
-          },
-
-          generateMatches(state) {
-            const players = state.players;
-            console.log("Génération des matchs avec", players.length, "joueurs");
-            const matches = [];
-
-            // Génération des matchs aller (chaque joueur contre chaque autre joueur)
-            for (let i = 0; i < players.length; i++) {
-              for (let j = i + 1; j < players.length; j++) {
-                matches.push({
-                  id: `match-aller-${i}-${j}`,
-                  player1: players[i].id,
-                  player2: players[j].id,
-                  round: 1
-                });
-              }
-            }
-
-            // Génération des matchs retour (mêmes joueurs, ordre inversé)
-            for (let i = 0; i < players.length; i++) {
-              for (let j = i + 1; j < players.length; j++) {
-                matches.push({
-                  id: `match-retour-${j}-${i}`,
-                  player1: players[j].id,
-                  player2: players[i].id,
-                  round: 2
-                });
-              }
-            }
-
-            // Mélanger les matchs tout en gardant les tours dans l'ordre
-            const round1Matches = matches.filter(m => m.round === 1).sort(() => Math.random() - 0.5);
-            const round2Matches = matches.filter(m => m.round === 2).sort(() => Math.random() - 0.5);
-
-            state.matches = [...round1Matches, ...round2Matches];
-            state.currentMatchIndex = 0;
-
-            console.log("Matchs générés:", state.matches.length);
-          },
-
-          // Ajoutons une mutation pour ajouter des tours supplémentaires si nécessaire
-          addMoreRounds(state) {
-            const lastRound = Math.max(...state.matches.map(m => m.round || 1));
-            const newRound = lastRound + 1;
-            const players = state.players;
-            const newMatches = [];
-
-            // Chaque joueur contre chaque autre joueur pour ce nouveau tour
-            // On alterne qui est player1/player2 entre les tours pairs et impairs
-            const isOddRound = newRound % 2 === 1;
-
-            for (let i = 0; i < players.length; i++) {
-              for (let j = i + 1; j < players.length; j++) {
-                newMatches.push({
-                  id: `match-round${newRound}-${i}-${j}`,
-                  player1: isOddRound ? players[i].id : players[j].id,
-                  player2: isOddRound ? players[j].id : players[i].id,
-                  round: newRound
-                });
-              }
-            }
-
-            // Mélanger les nouveaux matchs
-            const shuffledNewMatches = newMatches.sort(() => Math.random() - 0.5);
-
-            // Ajouter à la liste des matchs
-            state.matches = [...state.matches, ...shuffledNewMatches];
-            console.log("Matchs ajoutés pour le tour", newRound, ":", shuffledNewMatches.length);
-          },
-
-          recordMatchResult(state, { matchId, winner, player1DP, player2DP }) {
-            // Trouver le match concerné
-            const match = state.matches.find(m => m.id === matchId);
-            if (!match) return;
-
-            // Vérifier si ce match a déjà un résultat
-            const existingResultIndex = state.results.findIndex(r => r.matchId === matchId);
-
-            if (existingResultIndex !== -1) {
-              // Mettre à jour le résultat existant
-              state.results[existingResultIndex] = {
-                ...state.results[existingResultIndex],
-                matchId,
-                winner,
-                player1DP,
-                player2DP,
-                player1: match.player1,
-                player2: match.player2,
-                winnerDP: winner === match.player1 ? player1DP : player2DP,
-                loserDP: winner === match.player1 ? player2DP : player1DP,
-                date: new Date().toISOString()
-              };
-            } else {
-              // Ajouter un nouveau résultat
-              state.results.push({
-                matchId,
-                winner,
-                player1: match.player1,
-                player2: match.player2,
-                player1DP,
-                player2DP,
-                winnerDP: winner === match.player1 ? player1DP : player2DP,
-                loserDP: winner === match.player1 ? player2DP : player1DP,
-                date: new Date().toISOString()
-              });
-            }
-
-            // Passer au match suivant si tous les matchs n'ont pas été joués
-            if (state.currentMatchIndex < state.matches.length - 1) {
-              state.currentMatchIndex++;
-            }
-          },
-
-          resetTournament(state) {
-            state.tournament = null;
-            state.players = [];
-            state.matches = [];
-            state.currentMatchIndex = 0;
-            state.results = [];
-          },
-
-          loadState(state, loadedState) {
-            state.tournament = loadedState.tournament;
-            state.players = loadedState.players;
-            state.matches = loadedState.matches;
-            state.currentMatchIndex = loadedState.currentMatchIndex;
-            state.results = loadedState.results;
-          }
-        },
-        actions: {
-          saveStateToLocalStorage({ state }) {
-            localStorage.setItem('dbzTournamentState', JSON.stringify({
-              tournament: state.tournament,
-              players: state.players,
-              matches: state.matches,
-              currentMatchIndex: state.currentMatchIndex,
-              results: state.results
-            }));
-          },
-          loadStateFromLocalStorage({ commit }) {
-            const savedState = localStorage.getItem('dbzTournamentState');
-            if (savedState) {
-              commit('loadState', JSON.parse(savedState));
-              return true;
-            }
-            return false;
+        if (first.victories >= state.tournament.victoriesToWin) {
+          if (!state.tournament.tieBreakEnabled ||
+                  (first.victories - second.victories) >= 2) {
+            return first;
           }
         }
-      });
 
-      // Composants
-      const Home = {
-        template: `
-        <div class="container mx-auto p-4">
-          <div class="dbz-container p-6 max-w-md mx-auto">
-            <div class="dbz-header mb-6">
-              <h1 class="text-2xl font-bold text-center">Le Tournoi Des Arts Martiaux</h1>
-              <div class="tortue-geniale"></div>
+        return null;
+      },
+      completedMatches(state) {
+        return state.results.map(result => {
+          const match = state.matches.find(m => m.id === result.matchId);
+          if (!match) return null;
+
+          const player1 = state.players.find(p => p.id === match.player1);
+          const player2 = state.players.find(p => p.id === match.player2);
+          const winner = state.players.find(p => p.id === result.winner);
+
+          if (!player1 || !player2 || !winner) return null;
+
+          return {
+            ...result,
+            player1: match.player1,
+            player2: match.player2,
+            player1Name: player1.name,
+            player2Name: player2.name,
+            winnerName: winner.name,
+            player1DP: result.player1DP,
+            player2DP: result.player2DP
+          };
+        }).filter(match => match !== null);
+      },
+      isTournamentFinished(state, getters) {
+        return getters.tournamentWinner !== null;
+      }
+    },
+    mutations: {
+      createTournament(state, tournament) {
+        state.tournament = tournament;
+      },
+
+      addPlayer(state, player) {
+        state.players.push(player);
+      },
+
+      removePlayer(state, playerId) {
+        state.players = state.players.filter(p => p.id !== playerId);
+      },
+
+      generateMatches(state) {
+        const players = state.players;
+        console.log("Génération des matchs avec", players.length, "joueurs");
+        const matches = [];
+
+        for (let i = 0; i < players.length; i++) {
+          for (let j = i + 1; j < players.length; j++) {
+            matches.push({
+              id: `match-aller-${i}-${j}`,
+              player1: players[i].id,
+              player2: players[j].id,
+              round: 1
+            });
+          }
+        }
+
+        for (let i = 0; i < players.length; i++) {
+          for (let j = i + 1; j < players.length; j++) {
+            matches.push({
+              id: `match-retour-${j}-${i}`,
+              player1: players[j].id,
+              player2: players[i].id,
+              round: 2
+            });
+          }
+        }
+
+        const round1Matches = matches.filter(m => m.round === 1).sort(() => Math.random() - 0.5);
+        const round2Matches = matches.filter(m => m.round === 2).sort(() => Math.random() - 0.5);
+
+        state.matches = [...round1Matches, ...round2Matches];
+        state.currentMatchIndex = 0;
+
+        console.log("Matchs générés:", state.matches.length);
+      },
+
+      addMoreRounds(state) {
+        const lastRound = Math.max(...state.matches.map(m => m.round || 1));
+        const newRound = lastRound + 1;
+        const players = state.players;
+        const newMatches = [];
+
+        const isOddRound = newRound % 2 === 1;
+
+        for (let i = 0; i < players.length; i++) {
+          for (let j = i + 1; j < players.length; j++) {
+            newMatches.push({
+              id: `match-round${newRound}-${i}-${j}`,
+              player1: isOddRound ? players[i].id : players[j].id,
+              player2: isOddRound ? players[j].id : players[i].id,
+              round: newRound
+            });
+          }
+        }
+
+        const shuffledNewMatches = newMatches.sort(() => Math.random() - 0.5);
+
+        state.matches = [...state.matches, ...shuffledNewMatches];
+        console.log("Matchs ajoutés pour le tour", newRound, ":", shuffledNewMatches.length);
+      },
+
+      recordMatchResult(state, { matchId, winner, player1DP, player2DP }) {
+        const match = state.matches.find(m => m.id === matchId);
+        if (!match) return;
+
+        const existingResultIndex = state.results.findIndex(r => r.matchId === matchId);
+
+        if (existingResultIndex !== -1) {
+          state.results[existingResultIndex] = {
+            ...state.results[existingResultIndex],
+            matchId,
+            winner,
+            player1DP,
+            player2DP,
+            player1: match.player1,
+            player2: match.player2,
+            winnerDP: winner === match.player1 ? player1DP : player2DP,
+            loserDP: winner === match.player1 ? player2DP : player1DP,
+            date: new Date().toISOString()
+          };
+        } else {
+          state.results.push({
+            matchId,
+            winner,
+            player1: match.player1,
+            player2: match.player2,
+            player1DP,
+            player2DP,
+            winnerDP: winner === match.player1 ? player1DP : player2DP,
+            loserDP: winner === match.player1 ? player2DP : player1DP,
+            date: new Date().toISOString()
+          });
+        }
+
+        if (state.currentMatchIndex < state.matches.length - 1) {
+          state.currentMatchIndex++;
+        }
+      },
+
+      resetTournament(state) {
+        state.tournament = null;
+        state.players = [];
+        state.matches = [];
+        state.currentMatchIndex = 0;
+        state.results = [];
+      },
+
+      loadState(state, loadedState) {
+        state.tournament = loadedState.tournament;
+        state.players = loadedState.players;
+        state.matches = loadedState.matches;
+        state.currentMatchIndex = loadedState.currentMatchIndex;
+        state.results = loadedState.results;
+      }
+    },
+    actions: {
+      saveStateToLocalStorage({ state }) {
+        localStorage.setItem('dbzTournamentState', JSON.stringify({
+          tournament: state.tournament,
+          players: state.players,
+          matches: state.matches,
+          currentMatchIndex: state.currentMatchIndex,
+          results: state.results
+        }));
+      },
+      loadStateFromLocalStorage({ commit }) {
+        const savedState = localStorage.getItem('dbzTournamentState');
+        if (savedState) {
+          commit('loadState', JSON.parse(savedState));
+          return true;
+        }
+        return false;
+      },
+      checkAndAddMoreRounds({ state, getters, commit }) {
+        if (state.currentMatchIndex >= state.matches.length - 1 && !getters.tournamentWinner) {
+          commit('addMoreRounds');
+        }
+      }
+    }
+  });
+
+  const Home = {
+    template: `
+      <div class="container mx-auto p-4">
+        <div class="dbz-container p-6 max-w-md mx-auto">
+          <div class="dbz-header mb-6">
+            <h1 class="text-2xl font-bold text-center">Le Tournoi Des Arts Martiaux</h1>
+            <div class="tortue-geniale"></div>
+          </div>
+          <div class="flex flex-col items-center">
+            <img src="./dbz-logo.png" alt="Dragon Ball Tournament" class="mb-6 pulse-animation">
+            <p class="text-lg mb-6 text-center">Pas de place pour les faibles</p>
+
+            <div class="w-full flex flex-col space-y-4">
+              <router-link to="/create" class="dbz-button text-center" v-if="!tournamentExists">Créer un nouveau tournoi</router-link>
+              <router-link to="/matches" class="dbz-button text-center" v-if="tournamentExists">Continuer le tournoi</router-link>
+              <router-link to="/results" class="dbz-button text-center" v-if="tournamentExists">Voir les résultats</router-link>
+              <button @click="resetTournament" class="dbz-button bg-red-600 hover:bg-red-700" v-if="tournamentExists">Réinitialiser le tournoi</button>
             </div>
-            <div class="flex flex-col items-center">
-              <img src="./dbz-logo.png" alt="Dragon Ball Tournament" class="mb-6 pulse-animation">
-              <p class="text-lg mb-6 text-center">Pas de place pour les faibles</p>
+          </div>
+        </div>
+      </div>
+    `,
+    computed: {
+      tournamentExists() {
+        return this.$store.getters.tournamentExists;
+      }
+    },
+    methods: {
+      resetTournament() {
+        if (confirm("Êtes-vous sûr de vouloir réinitialiser le tournoi ? Toutes les données seront perdues.")) {
+          this.$store.commit('resetTournament');
+          this.$store.dispatch('saveStateToLocalStorage');
+        }
+      }
+    }
+  };
 
-              <div class="w-full flex flex-col space-y-4">
-                <router-link to="/create" class="dbz-button text-center" v-if="!tournamentExists">Créer un nouveau tournoi</router-link>
-                <router-link to="/matches" class="dbz-button text-center" v-if="tournamentExists">Continuer le tournoi</router-link>
-                <router-link to="/results" class="dbz-button text-center" v-if="tournamentExists">Voir les résultats</router-link>
-                <button @click="resetTournament" class="dbz-button bg-red-600 hover:bg-red-700" v-if="tournamentExists">Réinitialiser le tournoi</button>
+  const CreateTournament = {
+    template: `
+      <div class="container mx-auto p-4">
+        <div class="dbz-container p-6 max-w-md mx-auto">
+          <div class="dbz-header mb-6">
+            <h1 class="text-2xl font-bold">Créer un Tournoi</h1>
+          </div>
+
+          <form @submit.prevent="createTournament" class="space-y-6">
+            <div>
+              <label class="block text-gray-700 font-bold mb-2">Nombre de victoires requises</label>
+              <input v-model.number="victoriesToWin" type="number" min="1" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+
+            <div class="flex items-center">
+              <input v-model="tieBreakEnabled" type="checkbox" id="tiebreak" class="h-4 w-4 text-orange-600">
+              <label for="tiebreak" class="ml-2 block text-gray-700">Activer le tiebreak (2 victoires d'avance)</label>
+            </div>
+
+            <div>
+              <label class="block text-gray-700 font-bold mb-2">Joueurs</label>
+              <div v-for="(player, index) in players" :key="index" class="flex items-center mb-2">
+                <input v-model="player.name" type="text" placeholder="Nom du joueur" required class="flex-grow px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <button type="button" @click="removePlayer(index)" class="px-3 py-2 bg-red-500 text-white rounded-r hover:bg-red-600">&times;</button>
+              </div>
+
+              <div class="flex space-x-2">
+                <input v-model="newPlayerName" type="text" placeholder="Ajouter un joueur" class="flex-grow px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <button type="button" @click="addPlayer" class="px-3 py-2 bg-green-500 text-white rounded-r hover:bg-green-600">+</button>
               </div>
             </div>
-          </div>
-        </div>
-      `,
-        computed: {
-          tournamentExists() {
-            return this.$store.getters.tournamentExists;
-          }
-        },
-        methods: {
-          resetTournament() {
-            if (confirm("Êtes-vous sûr de vouloir réinitialiser le tournoi ? Toutes les données seront perdues.")) {
-              this.$store.commit('resetTournament');
-              this.$store.dispatch('saveStateToLocalStorage');
-            }
-          }
-        }
-      };
 
-      const CreateTournament = {
-        template: `
-    <div class="container mx-auto p-4">
-      <div class="dbz-container p-6 max-w-md mx-auto">
-        <div class="dbz-header mb-6">
-          <h1 class="text-2xl font-bold">Créer un Tournoi</h1>
-          <div class="tortue-geniale"></div>
-        </div>
-
-        <form @submit.prevent="createTournament" class="space-y-6">
-          <div>
-            <label class="block text-gray-700 font-bold mb-2">Nom du tournoi</label>
-            <input v-model="tournamentName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
-          </div>
-
-          <div>
-            <label class="block text-gray-700 font-bold mb-2">Nombre de victoires requises</label>
-            <input v-model.number="victoriesToWin" type="number" min="1" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
-          </div>
-
-          <div class="flex items-center">
-            <input v-model="tieBreakEnabled" type="checkbox" id="tiebreak" class="h-4 w-4 text-orange-600">
-            <label for="tiebreak" class="ml-2 block text-gray-700">Activer le tiebreak (2 victoires d'avance)</label>
-          </div>
-
-          <div>
-            <label class="block text-gray-700 font-bold mb-2">Joueurs</label>
-            <div v-for="(player, index) in players" :key="index" class="flex items-center mb-2">
-              <input v-model="player.name" type="text" placeholder="Nom du joueur" required class="flex-grow px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-orange-400">
-              <button type="button" @click="removePlayer(index)" class="px-3 py-2 bg-red-500 text-white rounded-r hover:bg-red-600">&times;</button>
+            <div class="flex justify-between">
+              <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Retour</router-link>
+              <button type="submit" class="dbz-button" :disabled="players.length < 2">Lancer le tournoi</button>
             </div>
-
-            <div class="flex space-x-2">
-              <input v-model="newPlayerName" type="text" placeholder="Ajouter un joueur" class="flex-grow px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-orange-400">
-              <button type="button" @click="addPlayer" class="px-3 py-2 bg-green-500 text-white rounded-r hover:bg-green-600">+</button>
-            </div>
-          </div>
-
-          <div class="flex justify-between">
-            <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Retour</router-link>
-            <button type="submit" class="dbz-button" :disabled="players.length < 2">Lancer le tournoi</button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
-  `,
-        data() {
-          return {
-            tournamentName: "",
-            victoriesToWin: 3,
-            tieBreakEnabled: true,
-            players: [
-              { id: "player-1", name: "" },
-              { id: "player-2", name: "" }
-            ],
-            newPlayerName: ""
-          };
-        },
-        methods: {
-          addPlayer() {
-            if (this.newPlayerName.trim()) {
-              this.players.push({
-                id: `player-${Date.now()}`, // Utiliser un timestamp pour garantir un ID unique
-                name: this.newPlayerName.trim()
-              });
-              this.newPlayerName = "";
-            }
-          },
-          removePlayer(index) {
-            if (this.players.length > 2) {
-              this.players.splice(index, 1);
-            } else {
-              alert("Il faut au moins 2 joueurs pour un tournoi.");
-            }
-          },
-          createTournament() {
-            if (this.players.length < 2) {
-              alert("Il faut au moins 2 joueurs pour un tournoi.");
-              return;
-            }
-
-            if (this.players.some(p => !p.name.trim())) {
-              alert("Tous les joueurs doivent avoir un nom.");
-              return;
-            }
-
-            console.log("Joueurs avant création:", JSON.stringify(this.players));
-
-            // Créer le tournoi
-            this.$store.commit('createTournament', {
-              name: this.tournamentName,
-              victoriesToWin: this.victoriesToWin,
-              tieBreakEnabled: this.tieBreakEnabled,
-              createdAt: new Date().toISOString()
-            });
-
-            // Vider le store avant d'ajouter les nouveaux joueurs
-            this.$store.state.players = [];
-
-            // Ajouter les joueurs
-            this.players.forEach(player => {
-              this.$store.commit('addPlayer', {
-                id: player.id,
-                name: player.name.trim()
-              });
-            });
-
-            console.log("Joueurs après ajout:", JSON.stringify(this.$store.state.players));
-
-            // Générer les matchs
-            this.$store.commit('generateMatches');
-
-            // Sauvegarder l'état
-            this.$store.dispatch('saveStateToLocalStorage');
-
-            // Rediriger vers la page des matchs
-            this.$router.push('/matches');
-          }
-        }
+    `,
+    data() {
+      return {
+        victoriesToWin: 15,
+        tieBreakEnabled: true,
+        players: [
+          { id: "player-1", name: "" },
+          { id: "player-2", name: "" }
+        ],
+        newPlayerName: ""
       };
+    },
+    methods: {
+      addPlayer() {
+        if (this.newPlayerName.trim()) {
+          this.players.push({
+            id: `player-${Date.now()}`,
+            name: this.newPlayerName.trim()
+          });
+          this.newPlayerName = "";
+        }
+      },
+      removePlayer(index) {
+        if (this.players.length > 2) {
+          this.players.splice(index, 1);
+        } else {
+          alert("Il faut au moins 2 joueurs pour un tournoi.");
+        }
+      },
+      createTournament() {
+        if (this.players.length < 2) {
+          alert("Il faut au moins 2 joueurs pour un tournoi.");
+          return;
+        }
 
-      const Matches = {
-        template: `
-    <div class="container mx-auto p-4">
-      <div class="dbz-container p-6 max-w-2xl mx-auto">
-        <div class="dbz-header mb-6">
-          <h1 class="text-2xl font-bold">Tous les Combats</h1>
-          <div class="tortue-geniale"></div>
-        </div>
+        if (this.players.some(p => !p.name.trim())) {
+          alert("Tous les joueurs doivent avoir un nom.");
+          return;
+        }
 
-        <div v-if="winner" class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clip-rule="evenodd" />
-              </svg>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm text-yellow-700">
-                Tournoi terminé ! <strong>{{ winner.name }}</strong> remporte le tournoi avec {{ winner.victories }} victoires !
-              </p>
-            </div>
-          </div>
-        </div>
+        console.log("Joueurs avant création:", JSON.stringify(this.players));
 
-        <div class="mb-6 p-4 bg-orange-100 rounded-lg">
-          <h2 class="font-bold mb-2">État du tournoi</h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <p><strong>Matchs terminés:</strong> {{ completedMatches.length }} / {{ allMatches.length }}</p>
-              <p><strong>Victoires requises:</strong> {{ victoriesToWin }}</p>
-            </div>
-            <div>
-              <p><strong>Tiebreak:</strong> {{ tieBreakEnabled ? "Activé" : "Désactivé" }}</p>
-              <p><strong>Tours générés:</strong> {{ rounds.length }}</p>
-            </div>
-          </div>
-        </div>
+        this.$store.commit('createTournament', {
+          victoriesToWin: this.victoriesToWin,
+          tieBreakEnabled: this.tieBreakEnabled,
+          createdAt: new Date().toISOString()
+        });
 
-        <div class="mb-6">
+        this.$store.state.players = [];
+
+        this.players.forEach(player => {
+          this.$store.commit('addPlayer', {
+            id: player.id,
+            name: player.name.trim()
+          });
+        });
+
+        console.log("Joueurs après ajout:", JSON.stringify(this.$store.state.players));
+
+        this.$store.commit('generateMatches');
+
+        this.$store.dispatch('saveStateToLocalStorage');
+
+        this.$router.push('/matches');
+      }
+    }
+  };
+
+  const Matches = {
+    template: `
+      <div class="container mx-auto p-4">
+        <div class="dbz-container p-6 max-w-2xl mx-auto">
+          <!-- header and tournament status -->
           <div v-for="round in rounds" :key="round" class="mb-8">
             <h2 class="text-xl font-bold mb-4 text-center text-orange-600 bg-orange-100 py-2 rounded">Tour {{ round }}</h2>
-
             <form @submit.prevent="saveAllResults" class="space-y-6">
               <div v-for="match in getMatchesByRound(round)" :key="match.id" class="bg-white p-4 rounded-lg shadow-md mb-6">
-                <div class="flex justify-between items-center mb-6">
-                  <div class="text-center flex-1">
-                    <div class="font-bold text-lg">{{ getPlayerName(match.player1) }}</div>
-                  </div>
-                  <div class="text-center text-xl font-bold">VS</div>
-                  <div class="text-center flex-1">
-                    <div class="font-bold text-lg">{{ getPlayerName(match.player2) }}</div>
-                  </div>
-                </div>
-
+                <!-- match details -->
                 <div class="flex justify-between mb-6">
                   <div class="player-card p-4 bg-gray-100 text-center flex-1 mr-2">
                     <div class="mb-2">
                       <label class="block text-gray-700 font-bold mb-2">DP du joueur</label>
-                      <select v-model="matchResults[match.id].player1DP" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
+                      <!-- Use v-if to ensure matchResults[match.id] exists -->
+                      <select v-if="matchResults[match.id]" v-model="matchResults[match.id].player1DP" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
                         <option v-for="n in 9" :key="n" :value="n+1">{{ n+1 }}</option>
                       </select>
                     </div>
                   </div>
-
                   <div class="player-card p-4 bg-gray-100 text-center flex-1 ml-2">
                     <div class="mb-2">
                       <label class="block text-gray-700 font-bold mb-2">DP du joueur</label>
-                      <select v-model="matchResults[match.id].player2DP" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
+                      <select v-if="matchResults[match.id]" v-model="matchResults[match.id].player2DP" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400">
                         <option v-for="n in 9" :key="n" :value="n+1">{{ n+1 }}</option>
                       </select>
                     </div>
                   </div>
                 </div>
-
-                <!-- Pour les matchs non terminés, afficher les boutons de sélection -->
                 <div v-if="!isMatchCompleted(match.id)" class="text-center mb-4">
                   <h3 class="font-bold mb-2">Qui a gagné ?</h3>
                   <div class="flex justify-center space-x-4">
-                    <button 
-                      type="button"
-                      @click="selectWinner(match.id, match.player1)" 
-                      :class="['dbz-button', matchResults[match.id].winner === match.player1 ? 'bg-green-600' : '']">
+                    <button
+                            type="button"
+                            @click="selectWinner(match.id, match.player1)"
+                            :class="['dbz-button', matchResults[match.id] && matchResults[match.id].winner === match.player1 ? 'bg-green-600' : '']">
                       {{ getPlayerName(match.player1) }}
                     </button>
-                    <button 
-                      type="button"
-                      @click="selectWinner(match.id, match.player2)" 
-                      :class="['dbz-button', matchResults[match.id].winner === match.player2 ? 'bg-green-600' : '']">
+                    <button
+                            type="button"
+                            @click="selectWinner(match.id, match.player2)"
+                            :class="['dbz-button', matchResults[match.id] && matchResults[match.id].winner === match.player2 ? 'bg-green-600' : '']">
                       {{ getPlayerName(match.player2) }}
                     </button>
                   </div>
                 </div>
-
-                <!-- Pour les matchs terminés, afficher le résultat et un bouton de modification -->
                 <div v-else class="text-center mb-4">
                   <div class="text-green-600 font-bold text-lg mb-2">
                     Match terminé - Vainqueur: {{ getPlayerName(getMatchResult(match.id).winner) }}
                   </div>
-                  <button 
-                    type="button" 
-                    @click="enableEditMatch(match.id)" 
-                    class="dbz-button bg-gray-500 hover:bg-gray-600">
+                  <button type="button" @click="enableEditMatch(match.id)" class="dbz-button bg-gray-500 hover:bg-gray-600">
                     Modifier le résultat
                   </button>
                 </div>
               </div>
             </form>
           </div>
-        </div>
-
-        <div class="flex justify-between">
-          <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Accueil</router-link>
-          <button @click="saveAllResults" class="dbz-button bg-green-600 hover:bg-green-700" :disabled="!hasChanges">Enregistrer les résultats</button>
-          <router-link to="/results" class="dbz-button">Voir les résultats</router-link>
+          <div class="flex justify-between">
+            <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Accueil</router-link>
+            <button @click="saveAllResults" class="dbz-button bg-green-600 hover:bg-green-700" :disabled="!hasChanges">Enregistrer les résultats</button>
+            <router-link to="/results" class="dbz-button">Voir les résultats</router-link>
+          </div>
         </div>
       </div>
-    </div>
-  `,
-        data() {
-          return {
-            matchResults: {},
-            editingMatchId: null
-          };
-        },
-        computed: {
-          allMatches() {
-            return this.$store.state.matches;
-          },
-          completedMatches() {
-            return this.$store.getters.completedMatches;
-          },
-          winner() {
-            return this.$store.getters.tournamentWinner;
-          },
-          rounds() {
-            // Obtenir tous les numéros de tours uniques
-            const rounds = this.allMatches.map(match => match.round || 1);
-            return [...new Set(rounds)].sort((a, b) => a - b);
-          },
-          victoriesToWin() {
-            return this.$store.state.tournament?.victoriesToWin || 0;
-          },
-          tieBreakEnabled() {
-            return this.$store.state.tournament?.tieBreakEnabled || false;
-          },
-          hasChanges() {
-            return Object.keys(this.matchResults).some(matchId => {
-              const result = this.matchResults[matchId];
-              const existingResult = this.getMatchResult(matchId);
-
-              if (!existingResult && result.winner) return true;
-              if (existingResult && (
-                existingResult.winner !== result.winner ||
-                existingResult.player1DP !== result.player1DP ||
-                existingResult.player2DP !== result.player2DP
-              )) return true;
-
-              return false;
-            });
+    `,
+    data() {
+      return {
+        matchResults: {},
+        editingMatchId: null
+      };
+    },
+    computed: {
+      allMatches() {
+        return this.$store.state.matches;
+      },
+      rounds() {
+        const rounds = this.allMatches.map(match => match.round || 1);
+        return [...new Set(rounds)].sort((a, b) => a - b);
+      },
+      victoriesToWin() {
+        return this.$store.state.tournament?.victoriesToWin || 0;
+      },
+      tieBreakEnabled() {
+        return this.$store.state.tournament?.tieBreakEnabled || false;
+      },
+      completedMatches() {
+        return this.$store.getters.completedMatches;
+      },
+      hasChanges() {
+        return Object.keys(this.matchResults).some(matchId => {
+          const result = this.matchResults[matchId];
+          const existing = this.getMatchResult(matchId);
+          if (!existing && result.winner) return true;
+          if (existing && (
+                  existing.winner !== result.winner ||
+                  existing.player1DP !== result.player1DP ||
+                  existing.player2DP !== result.player2DP
+          )) return true;
+          return false;
+        });
+      },
+      winner() {
+        return this.$store.getters.tournamentWinner;
+      }
+    },
+    created() {
+      this.initializeMatchResults();
+    },
+    watch: {
+      winner(newWinner) {
+        if (newWinner) {
+          this.$router.push('/results');
+        }
+      },
+      allMatches(newMatches) {
+        newMatches.forEach(match => {
+          if (!this.matchResults[match.id]) {
+            this.matchResults[match.id] = {
+              player1DP: 5,
+              player2DP: 5,
+              winner: null
+            };
           }
-        },
-        created() {
-          // Initialiser les résultats des matchs
-          this.initializeMatchResults();
-        },
-        methods: {
-          initializeMatchResults() {
-            // Initialiser tous les matchs avec des valeurs par défaut
-            this.$store.state.matches.forEach(match => {
-              // Chercher si ce match a déjà un résultat enregistré
-              const existingResult = this.$store.state.results.find(r => r.matchId === match.id);
-
-              if (existingResult) {
-                this.matchResults[match.id] = {
-                  player1DP: existingResult.player1DP,
-                  player2DP: existingResult.player2DP,
-                  winner: existingResult.winner
-                };
-              } else {
-                this.matchResults[match.id] = {
-                  player1DP: 5,
-                  player2DP: 5,
-                  winner: null
-                };
-              }
-            });
-          },
-// Dans le composant Matches, il manque l'implémentation de saveAllResults et il y a un problème avec les accolades
-
-// Ajouter la méthode saveAllResults() manquante et corriger la structure des accolades
-          getPlayerName(playerId) {
-            const player = this.$store.state.players.find(p => p.id === playerId);
-            return player ? player.name : 'Joueur inconnu';
-          },
-          getMatchesByRound(round) {
-            return this.allMatches.filter(match => (match.round || 1) === round);
-          },
-          selectWinner(matchId, playerId) {
-            console.log(`Tentative de sélection du gagnant: match=${matchId}, player=${playerId}`);
-            console.log(`État actuel:`, JSON.stringify(this.matchResults[matchId]));
-
-            // S'assurer que l'objet existe
-            if (!this.matchResults[matchId]) {
-              console.log(`Initialisation du résultat pour le match ${matchId}`);
-              this.matchResults[matchId] = { 
-                player1DP: 5, 
-                player2DP: 5, 
-                winner: null 
-              };
+        });
+      },
+      matchResults: {
+        deep: true,
+        handler(newResults) {
+          for (const matchId in newResults) {
+            const { winner, player1DP, player2DP } = newResults[matchId];
+            if (winner && player1DP && player2DP) {
+              this.$store.commit('recordMatchResult', {
+                matchId,
+                winner,
+                player1DP,
+                player2DP
+              });
             }
-
-            // Mettre à jour le gagnant
-            this.matchResults[matchId].winner = playerId;
+          }
+          this.$store.dispatch('saveStateToLocalStorage');
+        }
+      }
+    },
+    methods: {
+      initializeMatchResults() {
+        this.allMatches.forEach(match => {
+          if (!this.matchResults[match.id]) {
+            this.matchResults[match.id] = {
+              player1DP: 5,
+              player2DP: 5,
+              winner: null
+            };
+          }
+        });
+      },
+      getPlayerName(playerId) {
+        const player = this.$store.state.players.find(p => p.id === playerId);
+        return player ? player.name : 'Joueur inconnu';
+      },
+      getMatchesByRound(round) {
+        return this.allMatches.filter(match => (match.round || 1) === round);
+      },
+      selectWinner(matchId, playerId) {
+        if (!this.matchResults[matchId]) return;
+        this.matchResults[matchId].winner = playerId;
+        this.$store.commit('recordMatchResult', {
+          matchId,
+          winner: playerId,
+          player1DP: this.matchResults[matchId].player1DP,
+          player2DP: this.matchResults[matchId].player2DP
+        });
+        this.$store.dispatch('checkAndAddMoreRounds');
+        this.$store.dispatch('saveStateToLocalStorage');
+      },
+      saveAllResults() {
+        for (const matchId in this.matchResults) {
+          const result = this.matchResults[matchId];
+          if (result.winner) {
             this.$store.commit('recordMatchResult', {
               matchId,
-              winner: playerId,
-              player1DP: this.matchResults[matchId].player1DP,
-              player2DP: this.matchResults[matchId].player2DP
+              winner: result.winner,
+              player1DP: result.player1DP,
+              player2DP: result.player2DP
             });
-
-            // Réinitialiser l'état d'édition pour ce match
-            if (this.editingMatchId === matchId) {
-              this.editingMatchId = null;
-            }
-
-            this.$store.dispatch('saveStateToLocalStorage');
-          },
-          // Méthode manquante à ajouter
-          saveAllResults() {
-            for (const matchId in this.matchResults) {
-              const result = this.matchResults[matchId];
-              if (result.winner) {
-                this.$store.commit('recordMatchResult', {
-                  matchId,
-                  winner: result.winner,
-                  player1DP: result.player1DP,
-                  player2DP: result.player2DP
-                });
-              }
-            }
-            this.$store.dispatch('saveStateToLocalStorage');
-          },
-          isMatchCompleted(matchId) {
-            return this.$store.state.results.some(r => r.matchId === matchId);
-          },
-          getMatchResult(matchId) {
-            return this.$store.state.results.find(r => r.matchId === matchId) || {};
-          },
-          enableEditMatch(matchId) {
-            this.editingMatchId = matchId;
-          }
-        }, // Cette accolade ferme la méthode 'methods'
-        watch: {
-          matchResults: {
-            deep: true,
-            handler(newResults) {
-              for (const matchId in newResults) {
-                const result = newResults[matchId];
-                const { winner, player1DP, player2DP } = result;
-                if (winner && player1DP && player2DP) {
-                  this.$store.commit('recordMatchResult', {
-                    matchId,
-                    winner,
-                    player1DP,
-                    player2DP
-                  });
-                }
-              }
-              this.$store.dispatch('saveStateToLocalStorage');
-            }
           }
         }
-      };
+        this.$store.dispatch('checkAndAddMoreRounds');
+        this.$store.dispatch('saveStateToLocalStorage');
+      },
+      isMatchCompleted(matchId) {
+        return this.$store.state.results.some(r => r.matchId === matchId);
+      },
+      getMatchResult(matchId) {
+        return this.$store.state.results.find(r => r.matchId === matchId) || {};
+      },
+      enableEditMatch(matchId) {
+        this.editingMatchId = matchId;
+      }
+    }
+  };
 
-      const Results = {
-        template: `
-        <div class="container mx-auto p-4">
-          <div class="dbz-container p-6 max-w-md mx-auto">
-            <div class="dbz-header mb-6">
-              <h1 class="text-2xl font-bold">Résultats</h1>
-              <div class="tortue-geniale"></div>
-            </div>
+  const Results = {
+    template: `
+      <div class="container mx-auto p-4">
+        <div class="dbz-container p-6 max-w-md mx-auto">
+          <div class="dbz-header mb-6">
+            <h1 class="text-2xl font-bold">Résultats</h1>
+            <div class="tortue-geniale"></div>
+          </div>
 
-            <div v-if="winner" class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <div class="ml-3">
-                  <p class="text-sm text-yellow-700">
-                    Tournoi terminé ! <strong>{{ winner.name }}</strong> remporte le tournoi avec {{ winner.victories }} victoires !
-                  </p>
-                </div>
+          <div v-if="winner" class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-yellow-700">
+                  Tournoi terminé ! <strong>{{ winner.name }}</strong> remporte le tournoi avec {{ winner.victories }} victoires !
+                </p>
               </div>
             </div>
+          </div>
 
-            <div class="mb-6">
-              <div class="flex border-b border-gray-200">
-                <button 
-                  @click="activeTab = 'rankings'" 
-                  :class="['px-4 py-2 font-medium text-sm', activeTab === 'rankings' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
-                  Classement Victoires
-                </button>
-                <button 
-                  @click="activeTab = 'dp'" 
-                  :class="['px-4 py-2 font-medium text-sm', activeTab === 'dp' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
-                  Classement DP
-                </button>
-                <button 
-                  @click="activeTab = 'matches'" 
-                  :class="['px-4 py-2 font-medium text-sm', activeTab === 'matches' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
-                  Récap Combats
-                </button>
+          <div class="mb-6">
+            <div class="flex border-b border-gray-200">
+              <button
+                      @click="activeTab = 'rankings'"
+                      :class="['px-4 py-2 font-medium text-sm', activeTab === 'rankings' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
+                Classement Victoires
+              </button>
+              <button
+                      @click="activeTab = 'dp'"
+                      :class="['px-4 py-2 font-medium text-sm', activeTab === 'dp' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
+                Classement DP
+              </button>
+              <button
+                      @click="activeTab = 'matches'"
+                      :class="['px-4 py-2 font-medium text-sm', activeTab === 'matches' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-500 hover:text-gray-700']">
+                Récap Combats
+              </button>
+            </div>
+
+            <!-- Classement Victoires -->
+            <div v-if="activeTab === 'rankings'" class="mt-4">
+              <div class="bg-gray-100 p-3 rounded-t-lg flex font-bold">
+                <div class="w-10 text-center">#</div>
+                <div class="flex-grow">Joueur</div>
+                <div class="w-20 text-center">Victoires</div>
               </div>
-
-              <!-- Classement Victoires -->
-              <div v-if="activeTab === 'rankings'" class="mt-4">
-                <div class="bg-gray-100 p-3 rounded-t-lg flex font-bold">
-                  <div class="w-10 text-center">#</div>
-                  <div class="flex-grow">Joueur</div>
-                  <div class="w-20 text-center">Victoires</div>
-                </div>
-                <div v-for="(player, index) in playerRankings" :key="player.id" 
-                     :class="['flex p-3 border-b border-gray-200', index === 0 && playerRankings.length > 1 && player.victories > playerRankings[1].victories ? 'bg-yellow-100' : '']">
-                  <div class="w-10 text-center">{{ index + 1 }}</div>
-                  <div class="flex-grow">{{ player.name }}</div>
-                  <div class="w-20 text-center font-bold">{{ player.victories }}</div>
-                </div>
+              <div v-for="(player, index) in playerRankings" :key="player.id"
+                   :class="['flex p-3 border-b border-gray-200', index === 0 && playerRankings.length > 1 && player.victories > playerRankings[1].victories ? 'bg-yellow-100' : '']">
+                <div class="w-10 text-center">{{ index + 1 }}</div>
+                <div class="flex-grow">{{ player.name }}</div>
+                <div class="w-20 text-center font-bold">{{ player.victories }}</div>
               </div>
+            </div>
 
-              <!-- Classement DP -->
-              <div v-if="activeTab === 'dp'" class="mt-4">
-                <div class="bg-gray-100 p-3 rounded-t-lg flex font-bold">
-                  <div class="w-10 text-center">#</div>
-                  <div class="flex-grow">Joueur</div>
-                  <div class="w-20 text-center">Total DP</div>
-                </div>
-                <div v-for="(player, index) in dpRankings" :key="player.id" class="flex p-3 border-b border-gray-200">
-                  <div class="w-10 text-center">{{ index + 1 }}</div>
-                  <div class="flex-grow">{{ player.name }}</div>
-                  <div class="w-20 text-center font-bold">{{ player.dpTotal }}</div>
-                </div>
+            <!-- Classement DP -->
+            <div v-if="activeTab === 'dp'" class="mt-4">
+              <div class="bg-gray-100 p-3 rounded-t-lg flex font-bold">
+                <div class="w-10 text-center">#</div>
+                <div class="flex-grow">Joueur</div>
+                <div class="w-20 text-center">Total DP</div>
               </div>
+              <div v-for="(player, index) in dpRankings" :key="player.id" class="flex p-3 border-b border-gray-200">
+                <div class="w-10 text-center">{{ index + 1 }}</div>
+                <div class="flex-grow">{{ player.name }}</div>
+                <div class="w-20 text-center font-bold">{{ player.dpTotal }}</div>
+              </div>
+            </div>
 
-              <!-- Récap Combats -->
-              <div v-if="activeTab === 'matches'" class="mt-4">
-                <div v-if="completedMatches.length === 0" class="text-center p-4 text-gray-500">
-                  Aucun combat terminé pour le moment.
-                </div>
-                <div v-else class="space-y-3">
-                  <div v-for="match in completedMatches" :key="match.matchId" class="bg-white border border-gray-200 rounded p-3 shadow-sm">
-                    <div class="flex justify-between mb-2">
-                      <span class="text-gray-600">{{ new Date(match.date).toLocaleString() }}</span>
+            <!-- Récap Combats -->
+            <div v-if="activeTab === 'matches'" class="mt-4">
+              <div v-if="completedMatches.length === 0" class="text-center p-4 text-gray-500">
+                Aucun combat terminé pour le moment.
+              </div>
+              <div v-else class="space-y-3">
+                <div v-for="match in completedMatches" :key="match.matchId" class="bg-white border border-gray-200 rounded p-3 shadow-sm">
+                  <div class="flex justify-between mb-2">
+                    <span class="text-gray-600">{{ new Date(match.date).toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <div :class="['text-center flex-1', match.winner === match.player1 ? 'font-bold text-green-600' : '']">
+                      {{ match.player1Name }}
+                      <div class="text-orange-600">(DP: {{ match.player1DP }})</div>
                     </div>
-                    <div class="flex justify-between items-center">
-                      <div :class="['text-center flex-1', match.winner === match.player1 ? 'font-bold text-green-600' : '']">
-                        {{ match.player1Name }} 
-                        <div class="text-orange-600">(DP: {{ match.player1DP }})</div>
-                      </div>
-                      <div class="text-center text-sm text-gray-500">VS</div>
-                      <div :class="['text-center flex-1', match.winner === match.player2 ? 'font-bold text-green-600' : '']">
-                        {{ match.player2Name }}
-                        <div class="text-orange-600">(DP: {{ match.player2DP }})</div>
-                      </div>
+                    <div class="text-center text-sm text-gray-500">VS</div>
+                    <div :class="['text-center flex-1', match.winner === match.player2 ? 'font-bold text-green-600' : '']">
+                      {{ match.player2Name }}
+                      <div class="text-orange-600">(DP: {{ match.player2DP }})</div>
                     </div>
-                    <div class="text-center mt-2 text-sm">
-                      Vainqueur: <span class="font-bold">{{ match.winnerName }}</span>
-                    </div>
+                  </div>
+                  <div class="text-center mt-2 text-sm">
+                    Vainqueur: <span class="font-bold">{{ match.winnerName }}</span>
                   </div>
                 </div>
               </div>
-              </div>
-
-            <div class="flex justify-between mt-6">
-              <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Accueil</router-link>
-              <router-link to="/matches" class="dbz-button" v-if="!isTournamentFinished">Retour aux combats</router-link>
             </div>
           </div>
+
+          <div class="flex justify-between mt-6">
+            <router-link to="/" class="dbz-button bg-gray-500 hover:bg-gray-600">Accueil</router-link>
+            <router-link to="/matches" class="dbz-button" v-if="!isTournamentFinished">Retour aux combats</router-link>
+          </div>
         </div>
-      `,
-        data() {
-          return {
-            activeTab: 'rankings'
-          };
-        },
-        computed: {
-          playerRankings() {
-            return this.$store.getters.playerRankings;
-          },
-          dpRankings() {
-            return this.$store.getters.dpRankings;
-          },
-          completedMatches() {
-            return this.$store.getters.completedMatches;
-          },
-          winner() {
-            return this.$store.getters.tournamentWinner;
-          },
-          isTournamentFinished() {
-            return this.$store.getters.isTournamentFinished;
-          }
-        }
-      };
-
-      // Définition des routes
-      const routes = [
-        { path: '/', component: Home },
-        { path: '/create', component: CreateTournament },
-        { path: '/matches', component: Matches },
-        { path: '/results', component: Results }
-      ];
-
-      const router = createRouter({
-        history: createWebHashHistory(),
-        routes
-      });
-
-      // Middleware pour vérifier si un tournoi existe
-      router.beforeEach((to, from, next) => {
-        const tournamentExists = store.getters.tournamentExists;
-
-        if ((to.path === '/matches' || to.path === '/results') && !tournamentExists) {
-          next('/');
-        } else if (to.path === '/create' && tournamentExists) {
-          next('/');
-        } else {
-          next();
-        }
-      });
-
-      // Component racine
-      const App = {
-        template: `
-      <div class="min-h-screen">
-      <header class="bg-orange-600 text-white py-4">
-      <div class="container mx-auto px-4 flex justify-between items-center">
-      <h1 class="text-xl font-bold">Le Tournoi Des Arts Martiaux</h1>
-      <nav class="flex space-x-2" v-if="tournamentExists">
-      <router-link to="/" class="nav-link">Accueil</router-link>
-      <router-link to="/matches" class="nav-link">Combats</router-link>
-      <router-link to="/results" class="nav-link">Résultats</router-link>
-      </nav>
       </div>
-      </header>
-
-      <main class="py-8">
-      <router-view></router-view>
-      </main>
-
-      </div>
-      `,
-        computed: {
-          tournamentExists() {
-            return this.$store.getters.tournamentExists;
-          },
-          currentYear() {
-            return new Date().getFullYear();
-          }
-        }
+    `,
+    data() {
+      return {
+        activeTab: 'rankings'
       };
-
-      // Montage de l'application
-      const app = createApp(App);
-      app.use(store);
-      app.use(router);
-
-      app.mount('#app');
-
-      // Chargement de l'état depuis le localStorage au démarrage
-      store.dispatch('loadStateFromLocalStorage');
-
-      // Ajout d'une image de Tortue Géniale en CSS (avec une image placeholder)
-      const style = document.createElement('style');
-      style.textContent = `
-      .tortue-geniale {
-        background-image: url('/api/placeholder/80/80');
+    },
+    computed: {
+      playerRankings() {
+        return this.$store.getters.playerRankings;
+      },
+      dpRankings() {
+        return this.$store.getters.dpRankings;
+      },
+      completedMatches() {
+        return this.$store.getters.completedMatches;
+      },
+      winner() {
+        return this.$store.getters.tournamentWinner;
+      },
+      isTournamentFinished() {
+        return this.$store.getters.isTournamentFinished;
       }
-    `;
-      document.head.appendChild(style);
-    </script>
-  </body>
+    }
+  };
+
+  const routes = [
+    { path: '/', component: Home },
+    { path: '/create', component: CreateTournament },
+    { path: '/matches', component: Matches },
+    { path: '/results', component: Results }
+  ];
+
+  const router = createRouter({
+    history: createWebHashHistory(),
+    routes
+  });
+
+  router.beforeEach((to, from, next) => {
+    const tournamentExists = store.getters.tournamentExists;
+
+    if ((to.path === '/matches' || to.path === '/results') && !tournamentExists) {
+      next('/');
+    } else if (to.path === '/create' && tournamentExists) {
+      next('/');
+    } else {
+      next();
+    }
+  });
+
+  const App = {
+    template: `
+      <div class="min-h-screen">
+        <header class="bg-orange-600 text-white py-4">
+          <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold">Le Tournoi Des Arts Martiaux</h1>
+            <nav class="flex space-x-2" v-if="tournamentExists">
+              <router-link to="/" class="nav-link">Accueil</router-link>
+              <router-link to="/matches" class="nav-link">Combats</router-link>
+              <router-link to="/results" class="nav-link">Résultats</router-link>
+            </nav>
+          </div>
+        </header>
+
+        <main class="py-8">
+          <router-view></router-view>
+        </main>
+
+      </div>
+    `,
+    computed: {
+      tournamentExists() {
+        return this.$store.getters.tournamentExists;
+      },
+    }
+  };
+
+  const app = createApp(App);
+  app.use(store);
+  app.use(router);
+
+  app.mount('#app');
+
+  store.dispatch('loadStateFromLocalStorage');
+</script>
+</body>
 </html>
